@@ -1,0 +1,27 @@
+#!/bin/bash
+# Original location: /etc/cron.5min/ports @ tokamak
+# Opens (or attempts to open) ports using miniupnpc.
+# Should run as a cron-job every few minutes.
+
+# You might have to update this line if your ethernet device isn't eth0.
+IP_ADDR=$(ip -j addr show eth0 | jq -r '.[] | .addr_info[0].local')
+OUT_IP_ADDR=$(dig @resolver4.opendns.com myip.opendns.com +short)
+
+# call with: open_port <tcp|udp> <local_port> <remote_port>
+function open_port {
+	# Check if the mapping already exists.
+	if upnpc -l | grep -iFq "$3->$IP_ADDR:$2"; then
+		echo "port $2 $1 already mapped to outside $3"
+	else
+		echo "mapping port $2 $1 to outside $3"
+		# Attempt to map the port for 10 days.
+		if ! upnpc -a $IP_ADDR $2 $3 $1 864000; then
+			# Attempt again, this time ignoring errors.
+			# This might help if the endpoint is acting weird.
+			upnpc -i -a $IP_ADDR $2 $3 $1 864000
+		fi
+	fi
+}
+
+# Example:
+# open_port tcp 25565 25565
